@@ -1,8 +1,9 @@
 # Particle Field
 ```@docs
+FLOWUnsteady.vpm.Particle
 FLOWUnsteady.vpm.ParticleField
-FLOWUnsteady.vpm.cVPM
-FLOWUnsteady.vpm.rVPM
+FLOWUnsteady.vpm.ClassicVPM
+FLOWUnsteady.vpm.ReformulatedVPM
 FLOWUnsteady.vpm.add_particle
 FLOWUnsteady.vpm.get_particle
 FLOWUnsteady.vpm.remove_particle

@@ -33,8 +33,6 @@ while in the high end simulations become meshless large eddy simulations.
 * *Documentation:* [flow.byu.edu/FLOWUnsteady](https://flow.byu.edu/FLOWUnsteady)
 * *Code:* [github.com/byuflowlab/FLOWUnsteady](https://github.com/byuflowlab/FLOWUnsteady)
 
-NOTE (28 Aug 2025): The documentation is temporarily unavailable due to server issues. See the examples/ and docs/ folder in the meantime. It should be back up in the next few days.
-
 ### What is the Reformulated VPM?
 
 The [reformulated VPM](https://scholarsarchive.byu.edu/etd/9589/) is a meshless

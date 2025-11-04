@@ -425,10 +425,8 @@ function Vvpm_on_Xs!(Vvpm, pfield::vpm.ParticleField, Xs; static_particles_fun=(
         # NOTE: This doesn't include static particles, but there shouldn't be
         #       any in the field at this point anyways
         if abs(fsgm) != 1
-            for i in 1:pfield.np
-                if pfield.particles[vpm.STATIC_INDEX,i] > 0
-                    pfield.particles[vpm.SIGMA_INDEX] *= fsgm
-                end
+            for P in vpm.iterator(pfield)
+                P.sigma .*= fsgm
             end
         end
 
@@ -469,16 +467,14 @@ function Vvpm_on_Xs!(Vvpm, pfield::vpm.ParticleField, Xs; static_particles_fun=(
                 end
 
         # Remove static particles and probes
-        for p_i in vpm.get_np(pfield):-1:(org_np+1)
-            vpm.remove_particle(pfield, p_i)
+        for pi in vpm.get_np(pfield):-1:(org_np+1)
+            vpm.remove_particle(pfield, pi)
         end
 
         # De-singularize particles
         if abs(fsgm) != 1
-            for i in 1:pfield.np
-                if pfield.particles[vpm.STATIC_INDEX,i] > 0
-                    pfield.particles[vpm.SIGMA_INDEX] /= fsgm
-                end
+            for P in vpm.iterator(pfield)
+                P.sigma ./= fsgm
             end
         end
 
