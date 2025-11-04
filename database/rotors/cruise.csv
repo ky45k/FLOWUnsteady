@@ -1,0 +1,5 @@
+property,file,description
+Rtip,1.3716, (m) Radius of blade tip
+Rhub,0.288036, (m) Radius of hub
+B,6, Number of blades
+blade,cruise_blade.csv, Blade file

@@ -1,0 +1,8 @@
+property,file,description
+chorddist,lift_chorddist.csv, Chord distribution
+pitchdist,lift_pitchdist.csv, Pitch distribution
+sweepdist,lift_sweepdist.csv, LE sweep distribution
+heightdist,lift_heightdist.csv, LE height distribution
+airfoil_files,lift_airfoils.csv, Airfoil distribution
+spl_k,4,  Spline order
+spl_s,1.00E-07, Spline smoothing

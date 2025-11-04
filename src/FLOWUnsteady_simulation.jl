@@ -40,7 +40,7 @@ run_simulation(
     vpm_integration = vpm.rungekutta3,  # VPM time integration scheme (`vpm.euler` or `vpm.rungekutta3`)
     vpm_transposed  = true,             # VPM transposed stretching scheme
     vpm_viscous     = vpm.Inviscid(),   # VPM viscous diffusion scheme (`vpm.Inviscid()`, `vpm.CoreSpreading(nu, sgm0, zeta)`, or `vpm.ParticleStrengthExchange(nu)`)
-    vpm_fmm         = vpm.FMM(; p=4, ncrit=50, theta=0.4, nonzero_sigma=false, ε_tol=nothing), # VPM's FMM settings
+    vpm_fmm         = vpm.FMM(; p=4, ncrit=50, theta=0.4, phi=0.5), # VPM's FMM settings
     vpm_relaxation  = vpm.pedrizzetti,  # VPM relaxation scheme (`vpm.norelaxation`, `vpm.correctedpedrizzetti`, or `vpm.pedrizzetti`)
     vpm_surface     = true,             # Whether to include surfaces in the VPM through ASM/ALM
 
@@ -131,10 +131,9 @@ function run_simulation(
             vpm_integration = vpm.rungekutta3,  # VPM time integration scheme (`vpm.euler` or `vpm.rungekutta3`)
             vpm_transposed  = true,             # VPM transposed stretching scheme
             vpm_viscous     = vpm.Inviscid(),   # VPM viscous diffusion scheme (`vpm.Inviscid()`, `vpm.CoreSpreading(nu, sgm0, zeta)`, or `vpm.ParticleStrengthExchange(nu)`)
-            vpm_fmm         = vpm.FMM(;), # VPM's FMM settings
+            vpm_fmm         = vpm_fmm         = vpm.FMM(;), # VPM's FMM settings
             vpm_relaxation  = vpm.pedrizzetti,  # VPM relaxation scheme (`vpm.norelaxation`, `vpm.correctedpedrizzetti`, or `vpm.pedrizzetti`)
             vpm_surface     = true,             # Whether to include surfaces in the VPM through ASM/ALM
-            vpm_floattype   = Float64,
 
             # Actuator surface/line model (ASM/ALM): VLM and blade elements
             vlm_vortexsheet = false,            # Whether to spread surface circulation as a vortex sheet in the VPM (turns ASM on; ALM if false)
@@ -144,11 +143,6 @@ function run_simulation(
             vlm_rlx         = -1,               # VLM relaxation (>0.9 can cause divergence, <0.2 slows simulation too much, deactivated with <0)
             vlm_init        = false,            # Initialize the first step with the VLM semi-infinite wake solution
             hubtiploss_correction = vlm.hubtiploss_nocorrection, # Hub and tip loss correction of rotors (ignored in quasi-steady solver)
-
-            # method of images
-            mirror = false,                     # whether to mirror particles over a plane
-            mirror_X = nothing,                 # point on the plane
-            mirror_normal = nothing,            # mirror plane normal unit vector
 
             # Wake shedding
             wake_coupled        = true,         # Couple VPM wake -> VLM solution
@@ -164,6 +158,7 @@ function run_simulation(
             sigma_vlm_solver    = -1,           # Regularization of VLM solver (internal VLM-on-VLM)
             sigma_vlm_surf      = -1,           # (REQUIRED!) Size of embedded particles in ASM/ALM wing surfaces (for VLM-on-VPM and VLM-on-Rotor)
             sigma_rotor_surf    = -1,           # (REQUIRED!) Size of embedded particles in ALM blade surfaces (for Rotor-on-VPM, Rotor-on-VLM, and Rotor-on-Rotor)
+            sigma_rotor_self    = -1,           # Overwrite size of embedded particles for Rotor-on-Rotor velocity
             sigmafactor_vpm     = 1.0,          # Core overlap of wake particles
             sigmafactor_vpmonvlm = 1,           # (experimental) shrinks the particles by this factor when calculating VPM-on-VLM/Rotor induced velocities
             sigma_vpm_overwrite = nothing,      # Overwrite core size of wake to this value (ignoring `sigmafactor_vpm`)
@@ -235,22 +230,24 @@ function run_simulation(
     end
 
     # Initiate particle field
+    vpm_solver = [
+                    (:formulation, vpm_formulation),
+                    (:viscous, vpm_viscous),
+                    (:kernel, vpm_kernel),
+                    (:UJ, vpm_UJ),
+                    (:SFS, vpm_SFS),
+                    (:integration, vpm_integration),
+                    (:transposed, vpm_transposed),
+                    (:relaxation, vpm_relaxation),
+                    (:fmm, vpm_fmm),
+                 ]
     Xdummy = zeros(3)
-    pfield = vpm.ParticleField(max_particles, vpm_floattype; Uinf=t->Vinf(Xdummy, t),
-            formulation=vpm_formulation, viscous=vpm_viscous,
-            kernel=vpm_kernel, UJ=vpm_UJ, SFS=vpm_SFS,
-            integration=vpm_integration,
-            transposed=vpm_transposed, relaxation=vpm_relaxation,
-            fmm=vpm_fmm)                                                             
+    pfield = vpm.ParticleField(max_particles; Uinf=t->Vinf(Xdummy, t),
+                                                                  vpm_solver...)
 
-    max_staticp = max_static_particles==nothing ? 4*_get_m_static(sim.vehicle) : max_static_particles
-    mirror && (max_staticp += max_particles)
-    staticpfield = vpm.ParticleField(max_staticp, vpm_floattype; Uinf=t->Vinf(Xdummy, t),
-            formulation=vpm_formulation, viscous=vpm_viscous,
-            kernel=vpm_kernel, UJ=vpm_UJ, SFS=vpm_SFS,
-            integration=vpm_integration,
-            transposed=vpm_transposed, relaxation=vpm_relaxation,
-            fmm=vpm_fmm)
+    max_staticp = max_static_particles==nothing ? 2*(3*_get_m_static(sim.vehicle)) : max_static_particles
+    staticpfield = vpm.ParticleField(max_staticp; Uinf=t->Vinf(Xdummy, t),
+                                                                  vpm_solver...)
 
     if vpm_surface && max_static_particles==nothing && vlm_vortexsheet && raisewarnings
         @warn("Vortex sheet representation of VLM has been requested, but "*
@@ -264,112 +261,15 @@ function run_simulation(
         vpm.read!(pfield, restart_vpmfile; overwrite=true, load_time=false)
     end
 
-    if vpm_surface
-        static_particles_function = generate_static_particle_fun(pfield, staticpfield,
-                                    sim.vehicle, sigma_vlm_surf, sigma_rotor_surf;
-                                    vlm_vortexsheet=vlm_vortexsheet,
-                                    vlm_vortexsheet_overlap=vlm_vortexsheet_overlap,
-                                    vlm_vortexsheet_distribution=vlm_vortexsheet_distribution,
-                                    vlm_vortexsheet_sigma_tbv=vlm_vortexsheet_sigma_tbv,
-                                    save_path=save_static_particles ? save_path : nothing,
-                                    run_name=run_name, nsteps_save=nsteps_save,
-                                    mirror, mirror_X, mirror_normal)
-    else
-        static_particles_function = (pfield, t, dt)->nothing
-    end
 
     ############################################################################
-    # RUN SIMULATION
+    # SIMULATION RUNTIME FUNCTION
     ############################################################################
-    #=
-                      # RUNTIME OPTIONS
-                      runtime_function::Function=runtime_default,
-                      static_particles_function::Function=static_particles_default,
-                      custom_UJ=nothing,
-                      # OUTPUT OPTIONS
-                      save_path::Union{Nothing, String}=nothing,
-                      save_pfield::Bool=true,
-                      create_savepath::Bool=true,
-                      run_name::String="pfield",
-                      save_code::String="",
-                      nsteps_save::Int=1, prompt::Bool=true,
-                      verbose::Bool=true, verbose_nsteps::Int=10, v_lvl::Int=0,
-                      save_time=true)
-    =#
 
-    # extract vpm.run_vpm! function here:
-    run_name_vpm = run_name * "_pfield"
-    save_time = false
-    save_pfield = true
-    custom_UJ = nothing
-
-    # ERROR CASES
-    ## Check that viscous scheme and kernel are compatible
-    compatible_kernels = vpm._kernel_compatibility(pfield.viscous)
-
-    if !(pfield.kernel in compatible_kernels)
-        error("Kernel $(pfield.kernel) is not compatible with viscous scheme"*
-                " $(typeof(pfield.viscous).name); compatible kernels are"*
-                " $(compatible_kernels)")
-    end
-
-    if save_path!=nothing
-        # Create save path
-        if create_savepath; vpm.create_path(save_path, prompt); end;
-
-        # Save code
-        if save_code!=""
-            cp(save_code, joinpath(save_path, splitdir(save_code)[2]); force=true)
-        end
-
-        # Save settings
-        vpm.save_settings(pfield, run_name_vpm; path=save_path)
-    end
-
-    # Initialize verbose
-    runtime_function = nothing
-
-    (line1, line2, run_id, file_verbose,
-        vprintln, time_beg) = vpm.initialize_verbose(   verbose, save_path, run_name_vpm, pfield,
-                                                    dt, nsteps_save,
-                                                    runtime_function,
-                                                    static_particles_function, v_lvl)
-
-    # RUN
-    for i in 0:nsteps
-
-        if i%verbose_nsteps==0
-            vprintln("Time step $i out of $nsteps\tParticles: $(vpm.get_np(pfield))", v_lvl+1)
-        end
-
-        # Relaxation step
-        relax = pfield.relaxation != vpm.relaxation_none &&
-                pfield.relaxation.nsteps_relax >= 1 &&
-                i>0 && (i%pfield.relaxation.nsteps_relax == 0)
-
-        org_np = vpm.get_np(pfield)
-
-        # Time step
-        if i!=0
-            # Add static particles
-            remove = static_particles_function(pfield, pfield.t, dt)
-
-            # Step in time solving governing equations
-            vpm.nextstep(pfield, dt; relax=relax, custom_UJ=custom_UJ)
-
-            # Remove static particles (assumes particles remained sorted)
-            if remove==nothing || remove
-                for pi in vpm.get_np(pfield):-1:(org_np+1)
-                    vpm.remove_particle(pfield, pi)
-                end
-            end
-        end
-
-        #--- begin runtime function ---#
-        PFIELD = pfield
-        T = pfield.t
-        DT = dt
-        vprintln_vpm = (str)-> i%verbose_nsteps==0 ? vprintln(str, v_lvl+2) : nothing
+    """
+        This function gets called by `vpm.run_vpm!` at every time step.
+    """
+    function runtime_function(PFIELD, T, DT; vprintln=(args...)->nothing)
 
         # Move tilting systems, and translate and rotate vehicle
         nextstep_kinematic(sim, dt)
@@ -389,6 +289,7 @@ function run_simulation(
                 sigma_vlm_surf, sigma_rotor_surf, rho, sound_spd,
                 staticpfield, hubtiploss_correction;
                 init_sol=vlm_init, sigmafactor_vpmonvlm=sigmafactor_vpmonvlm,
+                sigma_rotor_self=sigma_rotor_self,
                 debug=debug)
 
         # Shed unsteady-loading wake with new solution
@@ -413,7 +314,7 @@ function run_simulation(
         end
 
         # Simulation-specific postprocessing
-        breakflag1 = extra_runtime_function(sim, PFIELD, T, DT; vprintln=vprintln_vpm)
+        breakflag = extra_runtime_function(sim, PFIELD, T, DT; vprintln=vprintln)
 
         # Output vtks
         if save_path!=nothing && PFIELD.nt%nsteps_save==0
@@ -428,46 +329,62 @@ function run_simulation(
             vprintln("Quitting time $(tquit) (s) has been reached. Simulation will now end.")
         end
 
-        breakflag = breakflag1 || breakflag2
-
-        #--- end runtime function ---#
-
-        # Save particle field
-        if save_pfield && save_path!=nothing && (i%nsteps_save==0 || i==nsteps || breakflag) && eltype(pfield) <: AbstractFloat
-            overwrite_time = save_time ? nothing : pfield.nt
-            vpm.save(pfield, run_name_vpm; path=save_path, add_num=true,
-                                        overwrite_time=overwrite_time)
-        end
-
-        # User-indicated end of simulation
-        if breakflag
-            break
-        end
-
+        return breakflag || breakflag2
     end
 
-    # Finalize verbose
-    vpm.finalize_verbose(time_beg, line1, vprintln, run_id, v_lvl)
+    if vpm_surface
+        static_particles_function = generate_static_particle_fun(pfield, staticpfield,
+                                    sim.vehicle, sigma_vlm_surf, sigma_rotor_surf;
+                                    vlm_vortexsheet=vlm_vortexsheet,
+                                    vlm_vortexsheet_overlap=vlm_vortexsheet_overlap,
+                                    vlm_vortexsheet_distribution=vlm_vortexsheet_distribution,
+                                    vlm_vortexsheet_sigma_tbv=vlm_vortexsheet_sigma_tbv,
+                                    save_path=save_static_particles ? save_path : nothing,
+                                    run_name=run_name, nsteps_save=nsteps_save)
+    else
+        static_particles_function = (pfield, t, dt)->nothing
+    end
+
+    ############################################################################
+    # RUN SIMULATION
+    ############################################################################
+    # Here it uses the VPM-time-stepping to run the simulation
+    vpm.run_vpm!(pfield, dt, nsteps;
+                      save_path=save_path, run_name=run_name*"_pfield",
+                      verbose=verbose, verbose_nsteps=verbose_nsteps,
+                      v_lvl=v_lvl,
+                      create_savepath=create_savepath,
+                      runtime_function=runtime_function,
+                      nsteps_save=nsteps_save,
+                      save_code=save_code,
+                      prompt=prompt,
+                      static_particles_function=static_particles_function,
+                      save_time=false
+                      )
 
     return pfield
 end
 
-function add_particle(pfield::vpm.ParticleField{TVPM,<:Any,<:Any,<:Any,<:Any,<:Any,<:Any,<:Any}, X,
-                        gamma, dt,
-                        V, infD,
-                        sigma, vol,
-                        l::Array{TF, 1}, p_per_step::Int64;
-                        overwrite_sigma=nothing) where {TF,TVPM}
+
+
+
+
+function add_particle(pfield::vpm.ParticleField, X::Array{Float64, 1},
+                        gamma::Float64, dt::Float64,
+                        V::Float64, infD::Array{Float64, 1},
+                        sigma::Float64, vol::Float64,
+                        l::Array{T1, 1}, p_per_step::Int64;
+                        overwrite_sigma=nothing) where {T1<:Real}
 
     Gamma = gamma*(V*dt)*infD       # Vectorial circulation
 
     # Avoid adding empty particles to the computational domain, or ExaFMM will
     # blow up
-    if sqrt(Gamma[1]^2 + Gamma[2]^2 + Gamma[3]^2) <= 5*eps(TVPM)
-        Gamma = 5*eps(TVPM)*ones(3)
+    if sqrt(Gamma[1]^2 + Gamma[2]^2 + Gamma[3]^2) <= 5*eps(vpm.RealFMM)
+        Gamma = 5*eps(vpm.RealFMM)*ones(3)
     end
 
-    circulation = max(abs(gamma), 5*eps(TVPM))
+    circulation = max(abs(gamma), 5*eps(vpm.RealFMM))
 
     # Decreases p_per_step for slowly moving parts of blade
     # aux = min((sigma/p_per_step)/overwrite_sigma, 1)
@@ -491,13 +408,16 @@ end
 """
 Returns the velocity induced by particle field on every position `Xs`
 """
-function Vvpm_on_Xs(pfield::vpm.ParticleField, Xs::Array{T, 1}; static_particles_fun=(args...)->nothing, dt=0, fsgm=1,
-                    mirror=false, mirror_X=nothing, mirror_normal=nothing) where {T}
+function Vvpm_on_Xs!(Vvpm, pfield::vpm.ParticleField, Xs; static_particles_fun=(args...)->nothing, dt=0, fsgm=1)
 
-    if length(Xs)!=0 # && vpm.get_np(pfield)!=0
+    @assert length(Vvpm) == length(Xs) ""*
+        "Vvpm and Xs do not have the same length ($(length(Vvpm)) != $(length(Xs)))"
+
+    if length(Xs)!=0 && vpm.get_np(pfield)!=0
         # Omit freestream
-        # Uinf = pfield.Uinf
-        # pfield.Uinf = (t)->zeros(3) # I don't think this is used
+        Uinf = pfield.Uinf
+        # Uinf를 임시로 저장하고 나중에 복원
+        # pfield.Uinf = (t)->zeros(3)  # 타입 문제로 건너뛰기
 
         org_np = vpm.get_np(pfield)             # Original particles
 
@@ -506,30 +426,12 @@ function Vvpm_on_Xs(pfield::vpm.ParticleField, Xs::Array{T, 1}; static_particles
         #       any in the field at this point anyways
         if abs(fsgm) != 1
             for P in vpm.iterator(pfield)
-                vpm.get_sigma(P) .*= fsgm
+                P.sigma .*= fsgm
             end
         end
 
         # Add static particles
         static_particles_fun(pfield, pfield.t, dt)
-
-        # method of images
-        if mirror
-            mirror_np = vpm.get_np(pfield)
-            for i in 1:mirror_np
-                P = vpm.get_particle(pfield, i)
-                X = SVector{3}(get_X(P))
-                Xm = X - dot(2*(X - mirror_X), mirror_normal) * mirror_normal
-                Γ = SVector{3}(get_Gamma(P))
-                Γm = 2*dot(Γ, mirror_normal) * Γ / norm(Γ) - Γ
-                σ = get_sigma(P)[]
-                vol=get_vol(P)[]
-                circulation=get_circulation(P)[]
-                C1, C2, C3 = get_C(P)
-                static=true
-                vpm.add_particle(pfield, Xm, Γm, σ; vol, circulation, C=SVector{3}(C1,C2,C3), static)
-            end
-        end
 
         sta_np = vpm.get_np(pfield)             # Original + static particles
 
@@ -541,8 +443,28 @@ function Vvpm_on_Xs(pfield::vpm.ParticleField, Xs::Array{T, 1}; static_particles
         # Evaluate velocity field
         pfield.UJ(pfield)
 
-        # Retrieve velocity at probes
-        Vvpm = [Array(vpm.get_U(P)) for P in vpm.iterator(pfield; start_i=sta_np+1)]
+                # 병렬화된 속도 계산 (수정됨: Julia 1.10.7 호환)
+                nthreads = Threads.nthreads()
+                nvpm = length(Vvpm)
+                
+                if nthreads > 1 && nvpm > 100  # 큰 문제일 때만 병렬화
+                    # println("VPM 스레드 병렬 속도 계산 활성화 (스레드 수: $nthreads, 점 수: $nvpm)")
+
+                    # 파티클 리스트를 먼저 수집 (zip 문제 해결)
+                    particles = collect(vpm.iterator(pfield; start_i=sta_np+1))
+                    
+                    # 병렬 계산
+                    Threads.@threads for i in 1:nvpm
+                        Vvpm[i] .= vpm.get_U(particles[i])
+                    end
+
+                    # println("  ✓ VPM 스레드 병렬 속도 계산 완료")
+                else
+                    # 단일 스레드 처리 (기존 로직)
+                    for (V, P) in zip(Vvpm, vpm.iterator(pfield; start_i=sta_np+1))
+                        V .= vpm.get_U(P)
+                    end
+                end
 
         # Remove static particles and probes
         for pi in vpm.get_np(pfield):-1:(org_np+1)
@@ -552,17 +474,21 @@ function Vvpm_on_Xs(pfield::vpm.ParticleField, Xs::Array{T, 1}; static_particles
         # De-singularize particles
         if abs(fsgm) != 1
             for P in vpm.iterator(pfield)
-                vpm.get_sigma(P) ./= fsgm
+                P.sigma ./= fsgm
             end
         end
 
         # Restore freestream
-        # pfield.Uinf = Uinf
+        pfield.Uinf = Uinf
     else
-        Vvpm = [zeros(3) for i in 1:length(Xs)]
+        for V in Vvpm
+            V .= 0
+        end
     end
 
     return Vvpm
 end
 
-add_probe(pfield::vpm.ParticleField, X) = vpm.add_particle(pfield, X, zeros(3), 1e-6; vol=0)
+# add_probe(pfield::vpm.ParticleField, X) = vpm.add_particle(pfield, X, zeros(3), 1e-6; vol=0)
+const zeros3 = zeros(3)
+add_probe(pfield::vpm.ParticleField, X) = vpm.add_particle(pfield, X, zeros3, 1e-12; vol=0)

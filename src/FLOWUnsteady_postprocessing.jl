@@ -26,7 +26,7 @@ function postprocess_statistics(read_path, save_path, nums;
                                     # PROCESSING OPTIONS
                                     idens           = [""],     # Use this to agglomerate multiple simulations
                                     to_exclude      = [],       # Exclude file names containing these words
-                                    cyl_axial_dir = nothing,  # Calculate cylindrical statistics if given an axial axis (vector)
+                                    cyl_axial_dir::Union{Nothing, Vector{Float64}} = nothing,  # Calculate cylindrical statistics if given an axial axis (vector)
                                     # OUTPUT OPTIONS
                                     prompt=true, debug=false,
                                     verbose=true, v_lvl=0)
@@ -193,33 +193,32 @@ function generate_preprocessing_fluiddomain_pfield(maxsigma, maxmagGamma; verbos
         mean_sigma, mean_Gamma = 0.0, 0.0
 
         for P in vpm.iterate(pfield; include_static=true)
-            sigma = vpm.get_sigma(P)
+
             # Check for large sigma
-            if sigma[1] > maxsigma
-                mean_sigma += sigma[1]
-                sigma[1] = maxsigma
+            if P.sigma[1] > maxsigma
+                mean_sigma += P.sigma[1]
+                P.sigma[1] = maxsigma
                 count_sigma += 1
             end
 
             # Check for Gamma with NaN value
-            Gamma = vpm.get_Gamma(P)
-            nangamma = !prod(isnan.(Gamma) .== false)
+            nangamma = !prod(isnan.(P.Gamma) .== false)
             if nangamma
-                Gamma .= 1e-12
+                P.Gamma .= 1e-12
                 count_nan += 1
             end
 
             # Check for blown-up Gamma
-            magGamma = norm(Gamma)
+            magGamma = norm(P.Gamma)
             if magGamma > maxmagGamma
-                Gamma *= maxmagGamma / magGamma
+                P.Gamma *= maxmagGamma / magGamma
                 mean_Gamma += magGamma
                 count_Gamma += 1
             end
 
             # Makes sure that the minimum Gamma is different than zero
             if magGamma < 1e-14
-                Gamma .+= 1e-14
+                P.Gamma .+= 1e-14
             end
 
             if isnan(magGamma)

@@ -1,0 +1,12 @@
+r/R,Contour file,Aero file
+0,NACA0012.csv,cylinder.csv
+0.1,NACA0012.csv,SBS10_airfoils_1.csv
+0.2,NACA0012.csv,SBS10_airfoils_2.csv
+0.3,NACA0012.csv,SBS10_airfoils_3.csv
+0.4,NACA0012.csv,SBS10_airfoils_4.csv
+0.5,NACA0012.csv,SBS10_airfoils_5.csv
+0.6,NACA0012.csv,SBS10_airfoils_6.csv
+0.7,NACA0012.csv,SBS10_airfoils_7.csv
+0.8,NACA0012.csv,SBS10_airfoils_8.csv
+0.9,NACA0012.csv,SBS10_airfoils_9.csv
+1,NACA0012.csv,SBS10_airfoils_10.csv

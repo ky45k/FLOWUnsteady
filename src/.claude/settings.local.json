@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "Read(//home/kweon/.julia/packages/FLOWVPM/d7F46/src/**)",
+      "Read(//home/kweon/.julia/packages/FLOWVPM/d7F46/examples/**)",
+      "Read(//home/kweon/.julia/packages/FLOWUnsteady/Hpw7b/examples/**)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}

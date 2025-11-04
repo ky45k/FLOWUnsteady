@@ -1,0 +1,20 @@
+r/R,Contour file,Aero file
+0,naca2412.csv,cylinder.csv
+0.15,naca2412.csv,even_airfoils1.csv
+0.2,naca2412.csv,even_airfoils2.csv
+0.25,naca2412.csv,even_airfoils3.csv
+0.3,naca2412.csv,even_airfoils4.csv
+0.35,naca2412.csv,even_airfoils5.csv
+0.4,naca2412.csv,even_airfoils6.csv
+0.45,naca2412.csv,even_airfoils7.csv
+0.5,naca2412.csv,even_airfoils8.csv
+0.55,naca2412.csv,even_airfoils9.csv
+0.6,naca2412.csv,even_airfoils10.csv
+0.65,naca2412.csv,even_airfoils11.csv
+0.7,naca2412.csv,even_airfoils12.csv
+0.75,naca2412.csv,even_airfoils13.csv
+0.8,naca2412.csv,even_airfoils14.csv
+0.85,naca2412.csv,even_airfoils15.csv
+0.9,naca2412.csv,even_airfoils16.csv
+0.95,naca2412.csv,even_airfoils17.csv
+1,naca2412.csv,even_airfoils18.csv

@@ -12,17 +12,17 @@ import FLOWUnsteady: vpm, gt, dot, norm
 
 # --------------- INPUTS AND OUTPUTS -------------------------------------------
 # INPUT OPTIONS
-simulation_name = "rotorhover-example-midhigh00"               # Simulation to read
-read_path       = "/home/edoalvar/simulationdata202330/"*simulation_name # Where to read simulation from
+simulation_name = "V_stacked_150_mid_high"               # Simulation to read
+read_path       = "/home/kweon"*simulation_name # Where to read simulation from
 
-pfield_prefix   = "singlerotor_pfield"      # Prefix of particle field files to read
-staticpfield_prefix = "singlerotor_staticpfield" # Prefix of static particle field files to read
+pfield_prefix   = "V_stacked_150_mid_high_pfield"      # Prefix of particle field files to read
+staticpfield_prefix = "V_stacked_150_mid_high_staticpfield" # Prefix of static particle field files to read
 
 nums            = [719]              # Time steps to process
 
 # OUTPUT OPTIONS
 save_path       = joinpath(read_path, "..", simulation_name*"-fdom")  # Where to save fluid domain
-output_prefix   = "singlerotor"             # Prefix of output files
+output_prefix   = "V_stacked_150_mid_high"             # Prefix of output files
 prompt          = true                      # Whether to prompt the user
 verbose         = true                      # Enable verbose
 v_lvl           = 0                         # Verbose indentation level

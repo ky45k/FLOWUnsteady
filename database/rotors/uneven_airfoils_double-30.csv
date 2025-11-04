@@ -1,0 +1,20 @@
+r/R,Contour file,Aero file
+0,naca2412.csv,cylinder.csv
+0.15,naca2412.csv,uneven_double_airfoils_-30_1.csv
+0.2,naca2412.csv,uneven_double_airfoils_-30_2.csv
+0.25,naca2412.csv,uneven_double_airfoils_-30_3.csv
+0.3,naca2412.csv,uneven_double_airfoils_-30_4.csv
+0.35,naca2412.csv,uneven_double_airfoils_-30_5.csv
+0.4,naca2412.csv,uneven_double_airfoils_-30_6.csv
+0.45,naca2412.csv,uneven_double_airfoils_-30_7.csv
+0.5,naca2412.csv,uneven_double_airfoils_-30_8.csv
+0.55,naca2412.csv,uneven_double_airfoils_-30_9.csv
+0.6,naca2412.csv,uneven_double_airfoils_-30_10.csv
+0.65,naca2412.csv,uneven_double_airfoils_-30_11.csv
+0.7,naca2412.csv,uneven_double_airfoils_-30_12.csv
+0.75,naca2412.csv,uneven_double_airfoils_-30_13.csv
+0.8,naca2412.csv,uneven_double_airfoils_-30_14.csv
+0.85,naca2412.csv,uneven_double_airfoils_-30_15.csv
+0.9,naca2412.csv,uneven_double_airfoils_-30_16.csv
+0.95,naca2412.csv,uneven_double_airfoils_-30_17.csv
+1,naca2412.csv,uneven_double_airfoils_-30_18.csv

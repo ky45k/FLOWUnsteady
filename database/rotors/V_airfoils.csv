@@ -1,0 +1,21 @@
+r/R,Contour file,Aero file
+0,NACA0015.csv,V_airfoils_hub.csv
+0.15,NACA0015.csv,V_airfoils_8000_1.csv
+0.2,NACA0012.csv,V_airfoils_8000_2.csv
+0.25,NACA0012.csv,V_airfoils_8000_3.csv
+0.3,NACA0012.csv,V_airfoils_8000_4.csv
+0.35,NACA0012.csv,V_airfoils_8000_5.csv
+0.4,NACA0012.csv,V_airfoils_8000_6.csv
+0.45,NACA0012.csv,V_airfoils_8000_7.csv
+0.5,NACA0012.csv,V_airfoils_8000_8.csv
+0.55,NACA0012.csv,V_airfoils_8000_9.csv
+0.6,NACA0012.csv,V_airfoils_8000_10.csv
+0.65,NACA0012.csv,V_airfoils_8000_11.csv
+0.7,NACA0012.csv,V_airfoils_8000_12.csv
+0.75,NACA0012.csv,V_airfoils_8000_13.csv
+0.8,NACA0012.csv,V_airfoils_8000_14.csv
+0.85,NACA0012.csv,V_airfoils_8000_15.csv
+0.9,NACA0012.csv,V_airfoils_8000_16.csv
+0.95,NACA0012.csv,V_airfoils_8000_17.csv
+0.975,NACA0012.csv,V_airfoils_8000_18.csv
+1,NACA0012.csv,V_airfoils_8000_19.csv

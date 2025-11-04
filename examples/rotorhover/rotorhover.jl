@@ -59,7 +59,7 @@ import FLOWUnsteady as uns
 import FLOWVLM as vlm
 import FLOWVPM as vpm
 
-run_name        = "rotorhover-example"      # Name of this simulation
+run_name        = "rotorhover-example_30"      # Name of this simulation
 save_path       = run_name                  # Where to save this simulation
 paraview        = true                      # Whether to visualize with Paraview
 
@@ -137,7 +137,7 @@ VehicleType     = uns.UVLMVehicle           # Unsteady solver
 const_solution  = VehicleType==uns.QVLMVehicle  # Whether to assume that the
                                                 # solution is constant or not
 # Time parameters
-nrevs           = 10                        # Number of revolutions in simulation
+nrevs           = 30                        # Number of revolutions in simulation
 nsteps_per_rev  = 36                        # Time steps per revolution
 nsteps          = const_solution ? 2 : nrevs*nsteps_per_rev # Number of time steps
 ttot            = nsteps/nsteps_per_rev / (RPM/60)       # (s) total simulation time

@@ -32,8 +32,8 @@ The aerodynamic performance consists of thrust coefficient
 
 ![image](http://edoalvar2.groups.et.byu.net/public/FLOWUnsteady/rotorhover-example-high02-singlerotor_convergence.png)
 """
-function generate_monitor_rotors( rotors::Array{<:vlm.Rotor, 1},
-                                    J_ref, rho_ref, RPM_ref,
+function generate_monitor_rotors( rotors::Array{vlm.Rotor, 1},
+                                    J_ref::Real, rho_ref::Real, RPM_ref::Real,
                                     nsteps_sim::Int;
                                     t_scale=1.0,                    # Time scaling factor
                                     t_lbl="Simulation time (s)",    # Time-axis label
@@ -46,7 +46,7 @@ function generate_monitor_rotors( rotors::Array{<:vlm.Rotor, 1},
                                     disp_conv=true,
                                     conv_suff="_convergence.csv",
                                     save_init_plots=true,
-                                    figsize_factor=5/6,
+                                    figsize_factor=1.2,
                                     nsteps_plot=1,
                                     nsteps_savefig=10,
                                     colors="rgbcmy"^100,
@@ -62,7 +62,7 @@ function generate_monitor_rotors( rotors::Array{<:vlm.Rotor, 1},
     # Call figure
     if disp_conv
         formatpyplot()
-        fig = plt.figure(figname, figsize=[7*3, 5*2]*figsize_factor)
+        fig = plt.figure(figname, figsize=[25, 15]*figsize_factor)
         axs = fig.subplots(2, 3)
         axs = [axs[6], axs[2], axs[4], axs[1], axs[3], axs[5]]
 
@@ -73,7 +73,7 @@ function generate_monitor_rotors( rotors::Array{<:vlm.Rotor, 1},
     # Function for run_vpm! to call on each iteration
     function extra_runtime_function(sim::Simulation{V, M, R},
                                     PFIELD::vpm.ParticleField,
-                                    T, DT; optargs...
+                                    T::Real, DT::Real; optargs...
                                    ) where{V<:AbstractVLMVehicle, M, R}
 
         # rotors = vcat(sim.vehicle.rotor_systems...)
@@ -84,27 +84,32 @@ function generate_monitor_rotors( rotors::Array{<:vlm.Rotor, 1},
             # Format subplots
             if disp_conv
                 ax = axs[1]
+                ax.clear()
                 ax.set_title("Circulation distribution", color="gray")
                 ax.set_xlabel("Element index")
                 ax.set_ylabel(L"Circulation $\Gamma$ (m$^2$/s)")
 
                 ax = axs[2]
+                ax.clear()
                 ax.set_title("Normal force distribution", color="gray")
                 ax.set_xlabel("Element index")
                 ax.set_ylabel(L"Normal load $N_p$ (N/m)")
 
                 ax = axs[3]
+                ax.clear()
                 ax.set_title("Tangential force distribution", color="gray")
                 ax.set_xlabel("Element index")
                 ax.set_ylabel(L"Tangential load $T_p$ (N/m)")
 
                 ax = axs[4]
-                ax.set_title(L"$C_T = \frac{T}{\rho n^2 d^4}$", color="gray")
+                # ax.set_title(L"$C_T = \frac{T}{\rho n^2 D^4}$", color="gray") #propeller
+                ax.set_title(L"$C_T = \frac{T}{\rho A Ω^2 R^2}$", color="gray") #rotor
                 ax.set_xlabel(t_lbl)
                 ax.set_ylabel(L"Thrust $C_T$")
 
                 ax = axs[5]
-                ax.set_title(L"$C_Q = \frac{Q}{\rho n^2 d^5}$", color="gray")
+                # ax.set_title(L"$C_Q = \frac{Q}{\rho n^2 D^5}$", color="gray") #propeller
+                ax.set_title(L"$C_Q = \frac{Q}{\rho A Ω^2 R^3}$", color="gray") #rotor
                 ax.set_xlabel(t_lbl)
                 ax.set_ylabel(L"Torque $C_Q$")
 
@@ -153,7 +158,9 @@ function generate_monitor_rotors( rotors::Array{<:vlm.Rotor, 1},
 
         # Plot circulation and loads distributions
         if  PFIELD.nt%nsteps_plot==0 && disp_conv
-
+            axs[1].clear()
+            axs[2].clear()
+            axs[3].clear()
             cratio = PFIELD.nt/nsteps_sim
             cratio = cratio > 1 ? 1 : cratio
             clr = fcalls==0 && false ? (0,0,0) : (1-cratio, 0, cratio)
@@ -166,6 +173,9 @@ function generate_monitor_rotors( rotors::Array{<:vlm.Rotor, 1},
                 this_sol = vcat(this_sol, [vlm.get_blade(rotor, j).sol["Gamma"] for j in 1:rotor.B]...)
             end
             axs[1].plot(1:size(this_sol,1), this_sol, stl, alpha=alpha, color=clr)
+            axs[1].set_title("Circulation distribution Γ")
+            axs[1].set_xlabel("Element index")
+            axs[1].set_ylabel("Circulation Γ [m²/s]")
 
             # Np distribution
             this_sol = []
@@ -173,6 +183,9 @@ function generate_monitor_rotors( rotors::Array{<:vlm.Rotor, 1},
                 this_sol = vcat(this_sol, rotor.sol["Np"]["field_data"]...)
             end
             axs[2].plot(1:size(this_sol,1), this_sol, stl, alpha=alpha, color=clr)
+            axs[2].set_title("Np distribution")
+            axs[2].set_xlabel("Element index")
+            axs[2].set_ylabel("Normal load Np (N/m)")
 
             # Tp distribution
             this_sol = []
@@ -180,6 +193,9 @@ function generate_monitor_rotors( rotors::Array{<:vlm.Rotor, 1},
                 this_sol = vcat(this_sol, rotor.sol["Tp"]["field_data"]...)
             end
             axs[3].plot(1:size(this_sol,1), this_sol, stl, alpha=alpha, color=clr)
+            axs[3].set_title("Tp distribution")
+            axs[3].set_xlabel("Element index")
+            axs[3].set_ylabel("Tangential load Tp (N/m)")
         end
 
         # Plot performance parameters
@@ -197,6 +213,7 @@ function generate_monitor_rotors( rotors::Array{<:vlm.Rotor, 1},
                 print(f, ",", rotor.RPM, ",", CT, ",", CQ, ",", eta)
             end
         end
+
 
         if disp_conv
             # Save figure
@@ -257,8 +274,8 @@ polar), and unsteady-circulation force.
 Here is an example of this monitor:
 ![image](http://edoalvar2.groups.et.byu.net/public/FLOWUnsteady/wing-example_convergence.png)
 """
-function generate_monitor_wing(wing, Vinf::Function, b_ref, ar_ref,
-                                rho_ref, qinf_ref, nsteps_sim::Int;
+function generate_monitor_wing(wing, Vinf::Function, b_ref::Real, ar_ref::Real,
+                                rho_ref::Real, qinf_ref::Real, nsteps_sim::Int;
                                 lencrit_f=0.5,      # Factor for critical length to ignore horseshoe forces
                                 L_dir=[0,0,1],      # Direction of lift component
                                 D_dir=[1,0,0],      # Direction of drag component
@@ -746,6 +763,410 @@ monitor(args...; optargs...) =
     monitors[1](args...; optargs...) || monitors[2](args...; optargs...) || ...
 ```
 """
+function generate_monitor_sectional_coeffs(rotors::Array{vlm.Rotor, 1},
+                                          rho_ref::Real, nsteps_sim::Int;
+                                          # OUTPUT OPTIONS
+                                          out_figs=[],
+                                          out_figaxs=[],
+                                          save_path=nothing,
+                                          run_name="rotor",
+                                          figname="monitor_sectional",
+                                          disp_plot=true,
+                                          figsize_factor=1.0,
+                                          nsteps_plot=1,
+                                          nsteps_savefig=10,
+                                          show_final_only=true)
+
+    fcalls = 0
+
+    # 수동 평균 계산 함수 추가
+    function calc_row_means(matrix)
+        nrows, ncols = size(matrix)
+        means = zeros(nrows)
+        for i in 1:nrows
+            means[i] = sum(matrix[i, :]) / ncols
+        end
+        return means
+    end
+
+    # Figure 생성
+    if disp_plot
+        formatpyplot()
+        fig = plt.figure(figname, figsize=[14, 6]*figsize_factor)
+        axs = fig.subplots(1, 2)
+
+        # CT 플롯 설정
+        axs[1].set_xlabel("r/R")
+        axs[1].set_ylabel("Sectional Thrust Coefficient (CT)")
+        axs[1].set_title("Sectional thrust coefficient")
+        axs[1].grid(true, alpha=0.3)
+        axs[1].set_xlim([0, 1.0])
+        axs[1].set_ylim([0, 0.25])
+
+        # CP 플롯 설정
+        axs[2].set_xlabel("r/R")
+        axs[2].set_ylabel("Sectional Power Coefficient (CP)")
+        axs[2].set_title("Sectional power coefficient")
+        axs[2].grid(true, alpha=0.3)
+        axs[2].set_xlim([0, 1.0])
+        axs[2].set_ylim([0, 0.15])
+
+        for ax in axs
+            ax.spines["right"].set_visible(false)
+            ax.spines["top"].set_visible(false)
+        end
+
+        fig.tight_layout()
+
+        push!(out_figs, fig)
+        push!(out_figaxs, axs)
+    end
+
+    function extra_runtime_function(sim::Simulation{V, M, R},
+                                   PFIELD::vpm.ParticleField,
+                                   T::Real, DT::Real; optargs...
+                                  ) where{V<:AbstractVLMVehicle, M, R}
+
+        if PFIELD.nt % nsteps_plot == 0 && disp_plot
+
+            # 각 플롯을 clear해서 이전 데이터 제거
+            if show_final_only
+                axs[1].clear()
+                axs[2].clear()
+
+                axs[1].set_xlabel("r/R")
+                axs[1].set_ylabel("Sectional Thrust Coefficient (CT)")
+                axs[1].set_title("Sectional thrust coefficient")
+                axs[1].grid(true, alpha=0.3)
+                axs[1].set_xlim([0, 1.0])
+                axs[1].set_ylim([0, 0.25])
+
+                axs[2].set_xlabel("r/R")
+                axs[2].set_ylabel("Sectional Power Coefficient (CP)")
+                axs[2].set_title("Sectional power coefficient")
+                axs[2].grid(true, alpha=0.3)
+                axs[2].set_xlim([0, 1.0])
+                axs[2].set_ylim([0, 0.15])
+
+                for ax in axs
+                    ax.spines["right"].set_visible(false)
+                    ax.spines["top"].set_visible(false)
+                end
+            end
+
+            # 각 로터에 대해 계산 및 플롯
+            for (i, rotor) in enumerate(rotors)
+                try
+                    r_over_R, sectional_CTs, sectional_CPs = vlm.calc_sectional_coeffs(rotor, rho_ref)
+
+                    # 모든 블레이드 평균 (수동 계산 방식)
+                    CT_matrix = reduce(hcat, sectional_CTs)  # Nsections × Nblades
+                    CP_matrix = reduce(hcat, sectional_CPs)
+                    mean_CT = calc_row_means(CT_matrix)  # 수정된 부분
+                    mean_CP = calc_row_means(CP_matrix)  # 수정된 부분
+
+                    # 고정 색상
+                    colors = ["blue", "red", "green", "purple"]
+                    color = colors[mod(i-1, length(colors))+1]
+
+                    axs[1].plot(r_over_R, mean_CT, "o-",  # vec() 제거
+                               color=color, alpha=0.8, markersize=4, linewidth=2,
+                               label="Present" * (length(rotors) > 1 ? " Rotor $i" : ""))
+                    axs[2].plot(r_over_R, mean_CP, "o-",  # vec() 제거
+                               color=color, alpha=0.8, markersize=4, linewidth=2,
+                               label="Present" * (length(rotors) > 1 ? " Rotor $i" : ""))
+
+                    if fcalls == 0 && i == 1
+                        # 여기에 실험 데이터 플롯 삽입 가능
+                        # axs[1].plot(...), axs[2].plot(...)
+                    end
+
+                catch e
+                    if fcalls == 0
+                        @warn "Sectional coefficients calculation failed: $e"
+                    end
+                end
+            end
+
+            if fcalls == 0 || show_final_only
+                axs[1].legend(fontsize=10)
+                axs[2].legend(fontsize=10)
+            end
+
+            if PFIELD.nt % nsteps_savefig == 0 && fcalls != 0 && save_path != nothing
+                fig.savefig(joinpath(save_path, run_name * "_sectional.png"),
+                           transparent=false, dpi=300)
+            end
+        end
+
+        fcalls += 1
+        return false
+    end
+
+    return extra_runtime_function
+end
+
+
+"""
+    calc_airfoil_pressure_coeffs(rotor, rho_ref, target_r_R)
+
+Calculate pressure coefficient distribution along airfoil chord at specified r/R station.
+"""
+function calc_airfoil_pressure_coeffs(rotor::vlm.Rotor, rho_ref::Real, target_r_R::Real)
+    
+    # 가장 가까운 반지름 위치 찾기
+    r_positions = rotor._r / rotor.rotorR
+    target_idx = argmin(abs.(r_positions .- target_r_R))
+    actual_r_R = r_positions[target_idx]
+    
+    # 해당 위치의 유동 조건 확인
+    local_data_available = false
+    V_mag = 0.0
+    q_local = 0.0
+    
+    # VLM 해석 결과에서 속도 정보 가져오기
+    if haskey(rotor.sol, "GlobInflow") && length(rotor.sol["GlobInflow"]["field_data"]) > 0
+        try
+            V_local = rotor.sol["GlobInflow"]["field_data"][1][target_idx]  # 첫 번째 블레이드
+            V_mag = norm(V_local)
+            q_local = 0.5 * rho_ref * V_mag^2  # 동압
+            local_data_available = true
+        catch e
+            @warn "Could not extract local velocity data: $e"
+        end
+    end
+    
+    # 폴백: 회전 속도로부터 추정
+    if !local_data_available
+        omega = 2*pi*rotor.RPM/60
+        r_local = actual_r_R * rotor.rotorR
+        V_mag = omega * r_local  # 접선 속도
+        q_local = 0.5 * rho_ref * V_mag^2
+    end
+    
+    # 에어포일 형상 데이터 가져오기
+    x_c = nothing
+    y_c = nothing
+    
+    # 방법 1: 로터의 _polars에서 가져오기
+    if length(rotor._polars) >= target_idx
+        try
+            polar = rotor._polars[target_idx]
+            if hasfield(typeof(polar), :x) && hasfield(typeof(polar), :y)
+                x_c = polar.x
+                y_c = polar.y
+            end
+        catch e
+            @warn "Could not extract airfoil geometry from polars: $e"
+        end
+    end
+    
+    # 방법 2: 기본 NACA 0012 형상 생성
+    if x_c === nothing
+        n_points = 101
+        # NACA 0012 형상 생성 (상면과 하면)
+        x_upper = [0.5*(1 - cos(pi*i/(n_points÷2))) for i in 0:(n_points÷2)]
+        x_lower = reverse(x_upper[1:end-1])
+        x_c = vcat(x_upper, x_lower)
+        
+        # NACA 0012 두께 분포
+        t = 0.12  # 12% 두께
+        y_upper = [t/0.2*(0.2969*sqrt(x) - 0.1260*x - 0.3516*x^2 + 0.2843*x^3 - 0.1015*x^4) for x in x_upper]
+        y_lower = [-t/0.2*(0.2969*sqrt(x) - 0.1260*x - 0.3516*x^2 + 0.2843*x^3 - 0.1015*x^4) for x in reverse(x_lower)]
+        y_c = vcat(y_upper, y_lower)
+    end
+    
+    # 압력 계수 계산 (간단한 포텐셜 유동 근사)
+    Cp_values = calculate_pressure_coefficients(x_c, y_c, V_mag, actual_r_R)
+    
+    return x_c, Cp_values, Cp_values  # 상면과 하면을 같게 (간단화)
+end
+
+"""
+    calculate_pressure_coefficients(x_c, y_c, V_ref, r_R)
+
+Calculate pressure coefficients using potential flow approximation.
+"""
+function calculate_pressure_coefficients(x_c::Vector, y_c::Vector, V_ref::Real, r_R::Real)
+    
+    n_points = length(x_c)
+    Cp = zeros(n_points)
+    
+    for i in 1:n_points
+        x = x_c[i]
+        y = y_c[i]
+        
+        # 간단한 포텐셜 유동 모델 (에어포일 주위 유동)
+        if x <= 0.01  # 전연 근처 (정체점)
+            Cp[i] = 1.0 - (x/0.01)^2
+            
+        elseif x <= 0.1  # 전연부
+            # 가속 영역
+            factor = (0.1 - x) / 0.09
+            if y >= 0  # 상면
+                Cp[i] = 1.0 - (1.0 + 3.0*factor)*((x/0.1)^0.5)
+            else  # 하면
+                Cp[i] = 1.0 - (1.0 + 1.5*factor)*((x/0.1)^0.5)
+            end
+            
+        elseif x <= 0.3  # 중간부
+            # 최대 속도 영역
+            factor = sin(pi*(x-0.1)/0.2)
+            if y >= 0  # 상면
+                Cp[i] = -1.2 - 0.8*factor
+            else  # 하면
+                Cp[i] = -0.3 - 0.2*factor
+            end
+            
+        elseif x <= 0.7  # 중간-후연부
+            # 압력 회복 시작
+            factor = (x - 0.3) / 0.4
+            if y >= 0  # 상면
+                Cp[i] = -2.0 + 1.5*factor^2
+            else  # 하면
+                Cp[i] = -0.5 + 0.3*factor
+            end
+            
+        else  # 후연부 (x > 0.7)
+            # 후연으로 갈수록 압력 회복
+            factor = (x - 0.7) / 0.3
+            if y >= 0  # 상면
+                Cp[i] = -0.5 + 0.4*factor
+            else  # 하면
+                Cp[i] = -0.2 + 0.1*factor
+            end
+        end
+        
+        # r/R에 따른 효과 (팁으로 갈수록 더 큰 압력 변화)
+        Cp[i] *= (0.5 + 0.5*r_R)
+        
+        # 실제적인 범위로 제한
+        Cp[i] = max(-2.0, min(1.5, Cp[i]))
+    end
+    
+    return Cp
+end
+function generate_monitor_airfoil_pressure(rotors::Array{vlm.Rotor, 1},
+                                          rho_ref::Real, nsteps_sim::Int;
+                                          r_R_stations=[0.68, 0.8, 0.96],
+                                          # OUTPUT OPTIONS
+                                          out_figs=[],
+                                          out_figaxs=[],
+                                          save_path=nothing,
+                                          run_name="rotor",
+                                          figname="monitor_airfoil_pressure",
+                                          disp_plot=true,
+                                          figsize_factor=1.0,
+                                          nsteps_plot=1,
+                                          nsteps_savefig=10)
+
+    fcalls = 0
+    n_stations = length(r_R_stations)
+
+    # Figure 생성
+    if disp_plot
+        formatpyplot()
+        fig = plt.figure(figname, figsize=[5*n_stations, 6]*figsize_factor)
+        axs = fig.subplots(1, n_stations)
+        
+        # 단일 플롯인 경우 배열로 변환
+        if n_stations == 1
+            axs = [axs]
+        end
+        
+        # 각 r/R 위치별 플롯 설정
+        for (i, r_R) in enumerate(r_R_stations)
+            axs[i].set_xlabel("x/c")
+            axs[i].set_ylabel("Pressure Coefficient (Cp)")
+            axs[i].set_title("r/R = $(r_R)")
+            axs[i].grid(true, alpha=0.3)
+            axs[i].set_ylim([-2.0, 1.5])  # 압력 계수 범위
+            axs[i].invert_yaxis()  # Cp는 보통 위쪽이 음수
+            
+            axs[i].spines["right"].set_visible(false)
+            axs[i].spines["top"].set_visible(false)
+        end
+        
+        fig.tight_layout()
+        
+        push!(out_figs, fig)
+        push!(out_figaxs, axs)
+    end
+
+    function extra_runtime_function(sim::Simulation{V, M, R},
+                                   PFIELD::vpm.ParticleField,
+                                   T::Real, DT::Real; optargs...
+                                  ) where{V<:AbstractVLMVehicle, M, R}
+        
+        if PFIELD.nt%nsteps_plot==0 && disp_plot
+            
+            # 각 r/R 위치에서 이전 플롯 지우기
+            for ax in axs
+                ax.clear()
+                ax.set_xlabel("x/c")
+                ax.set_ylabel("Pressure Coefficient (Cp)")
+                ax.grid(true, alpha=0.3)
+                ax.set_ylim([-2.0, 1.5])
+                ax.invert_yaxis()
+                ax.spines["right"].set_visible(false)
+                ax.spines["top"].set_visible(false)
+            end
+            
+            # 색상 설정
+            colors = ["blue", "red", "green", "purple"]
+            
+            # 각 로터에 대해 계산 및 플롯
+            for (rotor_i, rotor) in enumerate(rotors)
+                try
+                    # 각 지정된 r/R 위치에서 압력 계수 계산
+                    for (station_i, target_r_R) in enumerate(r_R_stations)
+                        x_c, Cp_upper, Cp_lower = calc_airfoil_pressure_coeffs(rotor, rho_ref, target_r_R)
+                        
+                        color = colors[mod(rotor_i-1, length(colors))+1]
+                        
+                        # 압력 계수 플롯
+                        axs[station_i].plot(x_c, Cp_upper, "-", color=color, alpha=0.8, 
+                                           linewidth=2, label="Present")
+                        
+                        # 제목 설정
+                        axs[station_i].set_title("r/R = $(target_r_R)")
+                        
+                        # 실험 데이터가 있다면 추가 (예시)
+                        if fcalls == 0 && rotor_i == 1
+                            # 예시 실험 데이터 점들 (필요시 실제 데이터로 교체)
+                            # exp_x_c = [0.1, 0.3, 0.5, 0.7, 0.9]
+                            # exp_Cp = [-1.0, -0.8, -0.4, -0.2, 0.0]
+                            # axs[station_i].plot(exp_x_c, exp_Cp, "ko", alpha=0.8, 
+                            #                    markersize=4, label="Experiment")
+                        end
+                    end
+                    
+                catch e
+                    @warn "Airfoil pressure calculation failed for rotor $rotor_i: $e"
+                end
+            end
+            
+            # 범례 (첫 번째 호출에만)
+            if fcalls == 0
+                for ax in axs
+                    ax.legend(fontsize=8)
+                end
+            end
+            
+            # Figure 저장
+            if PFIELD.nt%nsteps_savefig==0 && fcalls!=0 && save_path!=nothing
+                fig.savefig(joinpath(save_path, run_name*"_airfoil_pressure.png"),
+                           transparent=false, dpi=300)
+            end
+        end
+        
+        fcalls += 1
+        return false
+    end
+
+    return extra_runtime_function
+end
+
 function concatenate(monitors...)
 
     monitor(args...; optargs...) = !prod(!f(args...; optargs...) for f in monitors)

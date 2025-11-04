@@ -50,12 +50,13 @@ function run_noise_bpm(
 ```
 """
 function run_noise_bpm(         rotors::Array{vlm.Rotor, 1},             # Rotors
-                                RPM,                      # RPM of rotors
+                                RPM::Real,                      # RPM of rotors
                                 Vinf::Function,                 # Freestream
-                                rho, mu, speedofsound, # Air density, dynamic viscosity, and speed of sound
+                                rho::Real, mu::Real, speedofsound::Real, # Air density, dynamic viscosity, and speed of sound
                                 save_path::String;              # Where to save results
 
                                 # ---------- OBSERVERS --------------------------------------
+                                observer_type::String="sphere",
                                 sph_R       = 1.5*6.5,          # (m) sphere radius
                                 sph_nR      = 0,                # Number of cells in radial direction
                                 sph_ntht = 24, sph_nphi = 24,   # Number of cells in polar and azimuthal directions
@@ -63,6 +64,10 @@ function run_noise_bpm(         rotors::Array{vlm.Rotor, 1},             # Rotor
                                 sph_phimax  = 180,              # (deg) maximum azimuthal angle (use 180 to make a hemisphere)
                                 sph_rotation= [0, 90, 0],       # (degs) rotate the sphere by these angles
                                 sph_C       = zeros(3),         # (m) center of sphere
+                                lsc_R::Real = 50.0,
+                                lsc_degree_interval::Real=10.0,
+                                lsc_n::Int = 90,
+                                lsc_C = zeros(3),
                                 microphoneX = nothing,          # If given, replaces sphere with one observer at this position
 
                                 # ---------- BPM OPTIONS ------------------------------------
@@ -84,13 +89,43 @@ function run_noise_bpm(         rotors::Array{vlm.Rotor, 1},             # Rotor
     grid = nothing
 
     # Create observer
+    # if microphoneX == nothing
+
+    #     grid = noise.observer_sphere(sph_R, sph_nR, sph_ntht, sph_nphi;
+    #                                     phimax=sph_phimax,
+    #                                     rotation=sph_rotation,
+    #                                     thtmin=sph_thtmin, thtmax=sph_thtmax,
+    #                                     C=sph_C)
+
+    # end
+
+    # observer = microphoneX != nothing ?  microphoneX : grid
+    # Create observer
     if microphoneX == nothing
 
-        grid = noise.observer_sphere(sph_R, sph_nR, sph_ntht, sph_nphi;
-                                        phimax=sph_phimax,
-                                        rotation=sph_rotation,
-                                        thtmin=sph_thtmin, thtmax=sph_thtmax,
-                                        C=sph_C)
+        # observer_type 값에 따라 적절한 관측자 생성 함수를 호출
+        if observer_type == "sphere"
+
+            println("Generating spherical observer grid...")
+            grid = noise.observer_sphere(sph_R, sph_nR, sph_ntht, sph_nphi;
+                                            phimax=sph_phimax,
+                                            rotation=sph_rotation,
+                                            thtmin=sph_thtmin, thtmax=sph_thtmax,
+                                            C=sph_C)
+
+        elseif observer_type == "lower_semicircle"
+
+            println("Generating lower semicircle observer grid...")
+            grid = noise.observer_lower_semicircle(lsc_R, lsc_degree_interval;
+                                            C=lsc_C,
+                                            save_path=save_path,
+                                            file_name="observer_lower_semicircle")
+                                            # 필요하다면 fmt도 추가 가능
+
+        else
+            # 예외 처리: 지원하지 않는 observer_type이 입력될 경우 에러 발생
+            error("Unknown observer type: \"$(observer_type)\". Please use \"sphere\" or \"lower_semicircle\".")
+        end
 
     end
 
@@ -140,6 +175,11 @@ function run_noise_bpm(         rotors::Array{vlm.Rotor, 1},             # Rotor
         OASPLA = zeros(grid.nnodes, 1)
         SPLf = zeros(grid.nnodes, nf)
         SPLfA = zeros(grid.nnodes, nf)
+        # [MODIFIED] Add arrays for individual components
+        TBLTE = zeros(grid.nnodes, nf)
+        TBLTV = zeros(grid.nnodes, nf)
+        LBLVS = zeros(grid.nnodes, nf)
+        TEBVS = zeros(grid.nnodes, nf)
 
         for i = 1:grid.nnodes
             if verbose && ((i-1)%10==0 || i==grid.nnodes); println("\t"^(v_lvl+1)*"Observer $i out of $(grid.nnodes)"); end;
@@ -147,7 +187,15 @@ function run_noise_bpm(         rotors::Array{vlm.Rotor, 1},             # Rotor
             obs = grid.nodes[:,i] + [0.0, 0.0, h]
             obs = rotate_observers(obs, 90)
 
-            OASPL[i], OASPLA[i], SPLf[i,:], SPLfA[i,:] = BPM.turbinepos_multi(x, y, obs,
+            # [ORIGINAL] OASPL[i], OASPLA[i], SPLf[i,:], SPLfA[i,:] = BPM.turbinepos_multi(x, y, obs,
+            #                         winddir, windvel,
+            #                         rpm, B, hs,
+            #                         rad, c, c1, alpha,
+            #                         nu, c0,
+            #                         psi, AR,
+            #                         noise_correction; f=freq_bins, AdB=db_offset)
+            # [MODIFIED] Now also receive individual components
+            OASPL[i], OASPLA[i], SPLf[i,:], SPLfA[i,:], TBLTE[i,:], TBLTV[i,:], LBLVS[i,:], TEBVS[i,:] = BPM.turbinepos_multi(x, y, obs,
                                     winddir, windvel,
                                     rpm, B, hs,
                                     rad, c, c1, alpha,
@@ -157,16 +205,48 @@ function run_noise_bpm(         rotors::Array{vlm.Rotor, 1},             # Rotor
         end
 
     else
-        obs = observer + [0.0, 0.0, h] # offsetting observers to match height
-        obs = rotate_observers(obs, 90)
+        # [수정] 마이크 개수(행렬의 열 개수)를 가져옵니다.
+        n_observers = size(observer, 2)
 
-        OASPL, OASPLA, SPLf, SPLfA = BPM.turbinepos_multi(x, y, obs,
-                                                    winddir, windvel,
-                                                    rpm, B, hs,
-                                                    rad, c, c1, alpha,
-                                                    nu, c0,
-                                                    psi, AR,
-                                                    noise_correction; f=freq_bins, AdB=db_offset)
+        # [수정] 결과를 저장할 배열을 미리 생성합니다.
+        OASPL = zeros(n_observers, 1)
+        OASPLA = zeros(n_observers, 1)
+        SPLf = zeros(n_observers, nf)
+        SPLfA = zeros(n_observers, nf)
+        # [MODIFIED] Add arrays for individual components
+        TBLTE = zeros(n_observers, nf)
+        TBLTV = zeros(n_observers, nf)
+        LBLVS = zeros(n_observers, nf)
+        TEBVS = zeros(n_observers, nf)
+
+        # [수정] 각 마이크에 대해 반복문을 실행합니다.
+        for i = 1:n_observers
+            if verbose && ((i-1)%10==0 || i==n_observers); println("\t"^(v_lvl+1)*"Observer $i out of $(n_observers)"); end;
+
+            # [수정] i번째 마이크의 좌표(i번째 열)를 가져옵니다.
+            obs_single = observer[:, i]
+
+            # [수정] 단일 마이크 좌표에 오프셋을 적용하고 회전시킵니다.
+            obs = obs_single .+ [0.0, 0.0, h]
+            obs = rotate_observers(obs, 90)
+
+            # [ORIGINAL] [수정] 단일 마이크에 대한 소음을 계산하고 결과를 배열의 i번째 위치에 저장합니다.
+            # OASPL[i], OASPLA[i], SPLf[i,:], SPLfA[i,:] = BPM.turbinepos_multi(x, y, obs,
+            #                                                 winddir, windvel,
+            #                                                 rpm, B, hs,
+            #                                                 rad, c, c1, alpha,
+            #                                                 nu, c0,
+            #                                                 psi, AR,
+            #                                                 noise_correction; f=freq_bins, AdB=db_offset)
+            # [MODIFIED] Now also receive individual components
+            OASPL[i], OASPLA[i], SPLf[i,:], SPLfA[i,:], TBLTE[i,:], TBLTV[i,:], LBLVS[i,:], TEBVS[i,:] = BPM.turbinepos_multi(x, y, obs,
+                                                            winddir, windvel,
+                                                            rpm, B, hs,
+                                                            rad, c, c1, alpha,
+                                                            nu, c0,
+                                                            psi, AR,
+                                                            noise_correction; f=freq_bins, AdB=db_offset)
+        end
     end
 
 
@@ -225,6 +305,47 @@ function run_noise_bpm(         rotors::Array{vlm.Rotor, 1},             # Rotor
     header = string(header, "\n", "")
     write(f5, header)
 
+    # [MODIFIED] Add individual component files
+    # write TBLTE
+    filename = "TBLTE_spectrum.tec"
+    f6 = open(joinpath(save_path, filename), "w")
+    header = " TITLE='BPM TBLTE' "
+    header = string(header, "\n", "VARIABLES= 'TBLTE at each observer node'")
+    header = string(header, "\n", "")
+    header = string(header, "\n", "")
+    header = string(header, "\n", "")
+    write(f6, header)
+
+    # write TBLTV
+    filename = "TBLTV_spectrum.tec"
+    f7 = open(joinpath(save_path, filename), "w")
+    header = " TITLE='BPM TBLTV' "
+    header = string(header, "\n", "VARIABLES= 'TBLTV at each observer node'")
+    header = string(header, "\n", "")
+    header = string(header, "\n", "")
+    header = string(header, "\n", "")
+    write(f7, header)
+
+    # write LBLVS
+    filename = "LBLVS_spectrum.tec"
+    f8 = open(joinpath(save_path, filename), "w")
+    header = " TITLE='BPM LBLVS' "
+    header = string(header, "\n", "VARIABLES= 'LBLVS at each observer node'")
+    header = string(header, "\n", "")
+    header = string(header, "\n", "")
+    header = string(header, "\n", "")
+    write(f8, header)
+
+    # write TEBVS
+    filename = "TEBVS_spectrum.tec"
+    f9 = open(joinpath(save_path, filename), "w")
+    header = " TITLE='BPM TEBVS' "
+    header = string(header, "\n", "VARIABLES= 'TEBVS at each observer node'")
+    header = string(header, "\n", "")
+    header = string(header, "\n", "")
+    header = string(header, "\n", "")
+    write(f9, header)
+
     for i = 1:length(OASPL) # number of observers
         data1 = OASPL[i]
         data2 = OASPLA[i]
@@ -237,14 +358,28 @@ function run_noise_bpm(         rotors::Array{vlm.Rotor, 1},             # Rotor
             # flocal = f[j] #TODO: add frequency values to these files
             data3 = SPLf[i,j]
             data4 = SPLfA[i,j]
+            # [MODIFIED] Add individual component data
+            data6 = TBLTE[i,j]
+            data7 = TBLTV[i,j]
+            data8 = LBLVS[i,j]
+            data9 = TEBVS[i,j]
             write(f3, string(" ", data3)) # space at beginning and between each spl
             write(f4, string(" ", data4))
+            write(f6, string(" ", data6))
+            write(f7, string(" ", data7))
+            write(f8, string(" ", data8))
+            write(f9, string(" ", data9))
         end
         write(f5, string(" ", freq_bins[j]))
 
         write(f3, string("\n")) # go to next line for next frequency
         write(f4, string("\n"))
         write(f5, string("\n"))
+        # [MODIFIED] Add newlines for component files
+        write(f6, string("\n"))
+        write(f7, string("\n"))
+        write(f8, string("\n"))
+        write(f9, string("\n"))
     end
 
     close(f1)
@@ -252,6 +387,11 @@ function run_noise_bpm(         rotors::Array{vlm.Rotor, 1},             # Rotor
     close(f3)
     close(f4)
     close(f5)
+    # [MODIFIED] Close component files
+    close(f6)
+    close(f7)
+    close(f8)
+    close(f9)
     if verbose; println("\t"^v_lvl*"BPM calculation is done!"); end;
 
     return observer

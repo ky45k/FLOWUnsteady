@@ -1,0 +1,18 @@
+r/R,Contour file,Aero file
+0,VR_12.csv,cylinder.csv
+0.21,VR_12.csv,cruise_airfoils1.csv
+0.25,VR_12.csv,cruise_airfoils2.csv
+0.3,VR_12.csv,cruise_airfoils3.csv
+0.35,VR_12.csv,cruise_airfoils4.csv
+0.4,VR_12.csv,cruise_airfoils5.csv
+0.45,VR_12.csv,cruise_airfoils6.csv
+0.5,VR_12.csv,cruise_airfoils7.csv
+0.55,VR_12.csv,cruise_airfoils8.csv
+0.6,VR_12.csv,cruise_airfoils9.csv
+0.65,VR_12.csv,cruise_airfoils10.csv
+0.7,VR_12.csv,cruise_airfoils11.csv
+0.75,VR_12.csv,cruise_airfoils12.csv
+0.8,VR_12.csv,cruise_airfoils13.csv
+0.85,VR_12.csv,cruise_airfoils14.csv
+0.95,SSC_A09.csv,cruise_airfoils15.csv
+1,SSC_A09.csv,cruise_airfoils16.csv
