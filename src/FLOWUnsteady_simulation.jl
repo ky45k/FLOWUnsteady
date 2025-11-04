@@ -489,6 +489,15 @@ function Vvpm_on_Xs!(Vvpm, pfield::vpm.ParticleField, Xs; static_particles_fun=(
     return Vvpm
 end
 
+"""
+Non-mutating wrapper for Vvpm_on_Xs! that allocates output array
+"""
+function Vvpm_on_Xs(pfield::vpm.ParticleField, Xs; static_particles_fun=(args...)->nothing, dt=0, fsgm=1)
+    Vvpm = [zeros(3) for _ in 1:length(Xs)]
+    Vvpm_on_Xs!(Vvpm, pfield, Xs; static_particles_fun=static_particles_fun, dt=dt, fsgm=fsgm)
+    return Vvpm
+end
+
 # add_probe(pfield::vpm.ParticleField, X) = vpm.add_particle(pfield, X, zeros(3), 1e-6; vol=0)
 const zeros3 = zeros(3)
 add_probe(pfield::vpm.ParticleField, X) = vpm.add_particle(pfield, X, zeros3, 1e-12; vol=0)
